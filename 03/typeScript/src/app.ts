@@ -1,0 +1,3 @@
+class Animal{
+    name: string
+}
