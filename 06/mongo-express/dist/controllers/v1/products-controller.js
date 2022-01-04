@@ -13,7 +13,11 @@ const getProducts = async (req, res) => {
     const page = parseInt(req.query.page);
     const start = (page - 1) * itemsPerPage;
     const total = await product_1.default.count();
-    const products = await product_1.default.find().skip(start).limit(itemsPerPage);
+    const products = await product_1.default.find({
+        user: new mongoose_2.Types.ObjectId(req.session.userId),
+    })
+        .skip(start)
+        .limit(itemsPerPage);
     res.send({
         page: page,
         per_page: itemsPerPage,
@@ -27,7 +31,10 @@ const getProductById = async (req, res) => {
     try {
         const { productId } = req.params;
         (0, response_utils_1.validateObjectId)(productId);
-        const product = await product_1.default.findById(productId).populate({
+        const product = await product_1.default.findOne({
+            _id: productId,
+            user: new mongoose_2.Types.ObjectId(req.session.userId),
+        }).populate({
             path: "user",
             select: {
                 "password": 0,
@@ -48,13 +55,15 @@ const getProductById = async (req, res) => {
 exports.getProductById = getProductById;
 const createProduct = async (req, res) => {
     try {
-        const { name, year, price, description, user } = req.body;
+        const { userId } = req.session;
+        const { name, year, price, description } = req.body;
+        (0, response_utils_1.validateObjectId)(userId);
         const newProduct = await product_1.default.create({
             name,
             year,
             price,
             description,
-            user,
+            user: userId,
         });
         console.log(newProduct);
         res.send(newProduct);
@@ -72,13 +81,16 @@ const createProduct = async (req, res) => {
 exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     const id = req.params.productId;
-    const { name, year, description, price, user } = req.body;
-    const updatedProduct = product_1.default.findByIdAndUpdate(id, {
+    const { name, year, description, price } = req.body;
+    const updatedProduct = product_1.default.findOneAndUpdate({
+        _id: id,
+        user: req.session.userId
+    }, {
         name,
         year,
         description,
         price,
-        user,
+        user: req.session.userId
     });
     if (updatedProduct) {
         res.send({ data: updatedProduct });
@@ -90,14 +102,16 @@ const updateProduct = async (req, res) => {
 exports.updateProduct = updateProduct;
 const partialUpdateProduct = async (req, res) => {
     const productId = req.params.productId;
-    const { name, year, description, price, user } = req.body;
-    const product = await product_1.default.findById(productId);
+    const { name, year, description, price } = req.body;
+    const product = await product_1.default.findOne({
+        _id: productId,
+        user: req.session.userId
+    });
     if (product) {
         product.name = name || product.name;
         product.year = year || product.year;
         product.description = description || product.description;
         product.price = price || product.price;
-        product.user = user || product.user;
         await product.save();
         res.send({ data: product });
     }
@@ -111,7 +125,8 @@ const deleteProduct = async (req, res) => {
         const productId = req.params.productId;
         (0, response_utils_1.validateObjectId)(productId);
         const deleted = await product_1.default.deleteOne({
-            _id: new mongoose_2.Types.ObjectId(productId),
+            _id: productId,
+            user: req.session.userId
         });
         if (deleted.deletedCount > 0) {
             res.send({});

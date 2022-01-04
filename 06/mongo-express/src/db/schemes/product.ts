@@ -1,11 +1,11 @@
-import { Schema, model, Document, ObjectId } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 import { User } from './user';
 export interface Product extends Document{
     name:string,
     year:number,
     price?:number,
     description?:string,
-    user:ObjectId|User
+    user:Types.ObjectId|User
 }
 const schema = new Schema({
     name:{type:String, required:true},

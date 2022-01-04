@@ -3,9 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUser = exports.createUser = exports.getUserById = exports.getUsers = void 0;
+exports.login = exports.deleteUser = exports.createUser = exports.getUserById = exports.getUsers = void 0;
 const user_1 = __importDefault(require("../../db/schemes/user"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const mongoose_1 = require("mongoose");
 const response_utils_1 = require("../../utils/response_utils");
 const product_1 = __importDefault(require("../../db/schemes/product"));
@@ -41,9 +42,7 @@ const createUser = async (req, res) => {
     }
     catch (e) {
         if (e instanceof mongoose_1.mongo.MongoError) {
-            res
-                .status(400)
-                .send({
+            res.status(400).send({
                 code: e.code,
                 message: e.code === 11000 ? 'duplicated value' : 'error',
                 labels: e.errorLabels,
@@ -70,3 +69,28 @@ const deleteUser = async (req, res) => {
     }
 };
 exports.deleteUser = deleteUser;
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await user_1.default.findOne({ email });
+        if (!user) {
+            throw { code: 404, message: 'User not found' };
+        }
+        const isOk = await bcrypt_1.default.compare(password, user.password);
+        if (!isOk) {
+            throw { code: 401, message: 'Invalid password' };
+        }
+        const expiresIn = 60 * 60;
+        const token = jsonwebtoken_1.default.sign({
+            userId: user._id,
+            email: user.email,
+        }, process.env.JWT_SECRET, {
+            expiresIn,
+        });
+        res.send({ token: token, expiresIn: expiresIn });
+    }
+    catch (error) {
+        (0, response_utils_1.sendError)(res, error);
+    }
+};
+exports.login = login;

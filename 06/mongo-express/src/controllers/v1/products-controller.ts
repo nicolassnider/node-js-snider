@@ -13,7 +13,11 @@ export const getProducts = async (
   const start = (page - 1) * itemsPerPage;
   const total: number = await Products.count();
 
-  const products = await Products.find().skip(start).limit(itemsPerPage);
+  const products = await Products.find({
+    user: new Types.ObjectId(req.session.userId),
+  })
+  .skip(start)
+  .limit(itemsPerPage);
   res.send({
     page: page,
     per_page: itemsPerPage,
@@ -30,7 +34,12 @@ export const getProductById = async (
   try {
     const { productId } = req.params;
     validateObjectId(productId);
-    const product = await Products.findById(productId).populate({
+    const product = await Products.findOne(
+      {
+        _id:productId,
+        user:new Types.ObjectId(req.session.userId),
+      }
+      ).populate({
       path:"user",
       select:{
         "password":0,
@@ -53,13 +62,15 @@ export const createProduct = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { name, year, price, description, user } = req.body;
+    const {userId} = req.session;
+    const { name, year, price, description} = req.body;
+    validateObjectId(userId);
     const newProduct = await Products.create({
       name,
       year,
       price,
       description,
-      user,
+      user:userId,
     });
     console.log(newProduct);
     res.send(newProduct);
@@ -79,13 +90,17 @@ export const updateProduct = async (
   res: Response
 ): Promise<void> => {
   const id: string = req.params.productId;
-  const { name, year, description, price, user } = req.body;
-  const updatedProduct = Products.findByIdAndUpdate(id, {
+  const { name, year, description, price  } = req.body;
+  const updatedProduct = Products.findOneAndUpdate(
+    {
+      _id:id,
+      user: req.session.userId
+    }, {
     name,
     year,
     description,
     price,
-    user,
+    user:req.session.userId    
   });
 
   if (updatedProduct) {
@@ -100,14 +115,16 @@ export const partialUpdateProduct = async (
   res: Response
 ): Promise<void> => {
   const productId = req.params.productId;
-  const { name, year, description, price, user } = req.body;
-  const product = await Products.findById(productId);
+  const { name, year, description, price } = req.body;
+  const product = await Products.findOne({
+    _id:productId,
+    user:req.session.userId
+  });
   if (product) {
     product.name = name || product.name;
     product.year = year || product.year;
     product.description = description || product.description;
     product.price = price || product.price;
-    product.user = user || product.user;
     await product.save();
 
     res.send({ data: product });
@@ -126,7 +143,8 @@ export const deleteProduct = async (
     validateObjectId(productId);
 
     const deleted = await Products.deleteOne({
-      _id: new Types.ObjectId(productId),
+      _id: productId,
+      user: req.session.userId
     });
 
     if (deleted.deletedCount > 0) {
